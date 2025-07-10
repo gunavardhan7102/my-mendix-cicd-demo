@@ -1,0 +1,14 @@
+/Browse.class
+/CreateMonitoredItems.class
+/DeinitializeSubscription.class
+/DeleteMonitoredItems.class
+/FindServers.class
+/GetEndpoints.class
+/GetNodeDetails.class
+/InitializeSubscription.class
+/ReadNode.class
+/ServerCertificate_AddToTrustList.class
+/ServerCertificate_RemoveFromTrustList.class
+/ServerConfiguration_Delete.class
+/TestConnection.class
+/WriteNode.class
