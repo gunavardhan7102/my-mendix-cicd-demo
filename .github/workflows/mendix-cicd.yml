@@ -1,93 +1,50 @@
-name: Mendix CI/CD Pipeline  # A human-readable name for your workflow
+- name: Trigger Mendix Build and Wait for Completion
+  id: mendix_build
+  run: |
+    echo "Starting Mendix build for AppId: ${{ secrets.MENDIX_APP_ID }}"
 
-on:
-  push:
-    branches:
-      - main  # This pipeline will trigger automatically on pushes to the 'main' branch
-
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest  # Specifies the virtual machine to run the job on (a Linux environment)
-
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3  # This action checks out your repository code so the runner can access it
-
-    - name: Set up necessary tools (curl and jq)
-      run: |
-        # These tools are needed to make API calls and parse JSON responses
-        sudo apt-get update && sudo apt-get install -y curl jq
-
-    - name: Trigger Mendix Build and Wait for Completion
-      id: mendix_build  # Assigns an ID to this step so we can reference its output later
-      run: |
-        echo "Starting Mendix build for AppId: ${{ secrets.MENDIX_APP_ID }}"
-
-        # Make a POST request to the Mendix Build API to start a new build
-        # We use a POST request with an empty body, passing the branch to be built
-        response=$(curl --request POST 'https://deploy.mendix.com/api/1/apps/${{ secrets.MENDIX_APP_ID }}/packages' \
-          --header 'Content-Type: application/json' \
-          --header 'Mendix-Username: ${{ secrets.MENDIX_USERNAME }}' \
-          --header 'Mendix-ApiKey: ${{ secrets.MENDIX_API_KEY }}' \
-          --data-raw '{
-              "branch": "main" 
-          }')
-        echo "Build triggered. Response: $response"
-        
-        # We use 'jq' to parse the JSON response and get the 'id' of the new build package
-        build_id=$(echo "$response" | jq -r '.id')
-        
-        # This line makes the build_id available to subsequent steps in the pipeline
-        echo "build_id=$build_id" >> $GITHUB_OUTPUT
-        echo "Build ID is $build_id"
-        
-        # Poll the Mendix API to check the build status every 10 seconds until it's finished
-        status="BUILDING"
-        while [ "$status" != "SUCCEEDED" ] && [ "$status" != "FAILED" ]
-        do
-          sleep 10
-          build_status_response=$(curl 'https://deploy.mendix.com/api/1/apps/${{ secrets.MENDIX_APP_ID }}/packages/${build_id}' \
-            --header 'Mendix-Username: ${{ secrets.MENDIX_USERNAME }}' \
-            --header 'Mendix-ApiKey: ${{ secrets.MENDIX_API_KEY }}')
-          
-          status=$(echo "$build_status_response" | jq -r '.status')
-          echo "Current build status: $status"
-        done
-        
-        # If the build fails, the pipeline will stop here and report an error
-        if [ "$status" == "FAILED" ]; then
-          echo "Mendix build failed."
-          exit 1
-        fi
-
-    - name: Deploy to Mendix Free Node
-      id: mendix_deploy
-      run: |
-        # Use the build_id from the previous step
-        build_id=${{ steps.mendix_build.outputs.build_id }}
-        echo "Deploying build ID $build_id to Test environment..."
-        
-        # Make a POST request to the Mendix Deployment API
-        # The 'Test' environment is the default name for your Mendix Free Node
-        curl --request POST 'https://deploy.mendix.com/api/1/apps/${{ secrets.MENDIX_APP_ID }}/environments/Test/transport' \
-          --header 'Content-Type: application/json' \
-          --header 'Mendix-Username: ${{ secrets.MENDIX_USERNAME }}' \
-          --header 'Mendix-ApiKey: ${{ secrets.MENDIX_API_KEY }}' \
-          --data-raw '{
-              "packageId": "$build_id"
-          }'
-        
-        # NOTE: For a real-world pipeline, you would add a polling step here
-        # to wait for the deployment to finish before starting the app.
-        # We are skipping that for simplicity in this learning example.
-
-    - name: Start Mendix Free Node
-      run: |
-        echo "Starting Mendix Free Node..."
-        
-        # Make a POST request to the Mendix Start API
-        # This will turn on your Free Node with the new application version
-        curl --request POST 'https://deploy.mendix.com/api/1/apps/${{ secrets.MENDIX_APP_ID }}/environments/Test/start' \
-          --header 'Content-Type: application/json' \
-          --header 'Mendix-Username: ${{ secrets.MENDIX_USERNAME }}' \
-          --header 'Mendix-ApiKey: ${{ secrets.MENDIX_API_KEY }}'
+    # Make a POST request to the Mendix Build API to start a new build
+    # We now pass the revision (commit ID) and a version number.
+    BUILD_RESPONSE=$(curl --request POST 'https://deploy.mendix.com/api/1/apps/${{ secrets.MENDIX_APP_ID }}/packages' \
+      --header 'Content-Type: application/json' \
+      --header 'Mendix-Username: ${{ secrets.MENDIX_USERNAME }}' \
+      --header 'Mendix-ApiKey: ${{ secrets.MENDIX_API_KEY }}' \
+      --data-raw '{
+          "branch": "main",
+          "revision": "${{ github.sha }}",
+          "version": "1.0.0.0"
+      }')
+    
+    echo "Build triggered. Response: ${BUILD_RESPONSE}"
+    
+    # We use 'jq' to parse the JSON response and get the 'id' of the new build package
+    build_id=$(echo "${BUILD_RESPONSE}" | jq -r '.id')
+    
+    # Check if a build ID was returned. If not, something went wrong.
+    if [ "$build_id" == "null" ] || [ "$build_id" == "" ]; then
+      echo "Failed to start Mendix build. Check the API response for errors."
+      exit 1
+    fi
+    
+    # This line makes the build_id available to subsequent steps in the pipeline
+    echo "build_id=$build_id" >> $GITHUB_OUTPUT
+    echo "Build ID is $build_id"
+    
+    # Poll the Mendix API to check the build status every 10 seconds until it's finished
+    status="BUILDING"
+    while [ "$status" != "SUCCEEDED" ] && [ "$status" != "FAILED" ]
+    do
+      echo "Current build status: $status"
+      sleep 10
+      build_status_response=$(curl 'https://deploy.mendix.com/api/1/apps/${{ secrets.MENDIX_APP_ID }}/packages/${build_id}' \
+        --header 'Mendix-Username: ${{ secrets.MENDIX_USERNAME }}' \
+        --header 'Mendix-ApiKey: ${{ secrets.MENDIX_API_KEY }}')
+      
+      status=$(echo "$build_status_response" | jq -r '.status')
+    done
+    
+    # If the build fails, the pipeline will stop here and report an error
+    if [ "$status" == "FAILED" ]; then
+      echo "Mendix build failed."
+      exit 1
+    fi
