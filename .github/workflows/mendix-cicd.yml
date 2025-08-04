@@ -27,15 +27,16 @@ jobs:
       run: |
         echo "Starting Mendix build for AppId: $APP_ID"
 
+        # Use printf to create a well-formed JSON payload
+        PAYLOAD=$(printf '{"branch": "main", "revision": "%s", "version": "1.0.0.0"}' "$GIT_SHA")
+        
+        echo "Generated JSON payload: ${PAYLOAD}"
+
         BUILD_RESPONSE=$(curl --request POST "https://deploy.mendix.com/api/1/apps/$APP_ID/packages" \
           --header "Content-Type: application/json" \
           --header "Mendix-Username: $USERNAME" \
           --header "Mendix-ApiKey: $API_KEY" \
-          --data-raw '{
-              "branch": "main",
-              "revision": "'"$GIT_SHA"'",
-              "version": "1.0.0.0"
-          }')
+          --data-raw "$PAYLOAD")
         
         echo "Build triggered. Response: ${BUILD_RESPONSE}"
         
@@ -43,6 +44,7 @@ jobs:
         
         if [ "$build_id" == "null" ] || [ "$build_id" == "" ]; then
           echo "Failed to start Mendix build. Check the API response for errors."
+          echo "API Response was: ${BUILD_RESPONSE}" # Add the response to the error message for better debugging
           exit 1
         fi
         
@@ -76,13 +78,13 @@ jobs:
         build_id=${{ steps.mendix_build.outputs.build_id }}
         echo "Deploying build ID $build_id to Test environment..."
         
+        PAYLOAD=$(printf '{"packageId": "%s"}' "$build_id")
+
         curl --request POST "https://deploy.mendix.com/api/1/apps/$APP_ID/environments/Test/transport" \
           --header "Content-Type: application/json" \
           --header "Mendix-Username: $USERNAME" \
           --header "Mendix-ApiKey: $API_KEY" \
-          --data-raw '{
-              "packageId": "'"$build_id"'"
-          }'
+          --data-raw "$PAYLOAD"
 
     - name: Start Mendix Free Node
       env:
