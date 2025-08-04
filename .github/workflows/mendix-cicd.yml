@@ -17,22 +17,44 @@ jobs:
       run: |
         sudo apt-get update && sudo apt-get install -y curl jq
 
+    - name: Get Mendix Team Server Revision
+      id: get_mendix_revision
+      env:
+        PROJECT_ID: ${{ secrets.MENDIX_PROJECT_ID }}
+        API_KEY: ${{ secrets.MENDIX_API_KEY }}
+        BRANCH_NAME: "main"
+      run: |
+        echo "Retrieving latest Mendix revision for project $PROJECT_ID..."
+        REVISION_RESPONSE=$(curl "https://repository.api.mendix.com/v1/repositories/$PROJECT_ID/branches/$BRANCH_NAME/commits" \
+          --header "Authorization: MxToken $API_KEY")
+
+        LATEST_REVISION_ID=$(echo "$REVISION_RESPONSE" | jq -r '.items[0].id')
+        
+        if [ "$LATEST_REVISION_ID" == "null" ] || [ "$LATEST_REVISION_ID" == "" ]; then
+          echo "Failed to retrieve the latest Mendix revision. Please check your PROJECT_ID and API_KEY."
+          echo "API Response was: ${REVISION_RESPONSE}"
+          exit 1
+        fi
+
+        echo "Latest Mendix revision ID is $LATEST_REVISION_ID"
+        echo "revision_id=$LATEST_REVISION_ID" >> $GITHUB_OUTPUT
+
     - name: Trigger Mendix Build and Wait for Completion
       id: mendix_build
       env:
         APP_ID: ${{ secrets.MENDIX_APP_ID }}
         USERNAME: ${{ secrets.MENDIX_USERNAME }}
         API_KEY: ${{ secrets.MENDIX_API_KEY }}
-        GIT_SHA: ${{ github.sha }}
+        MENDIX_REVISION: ${{ steps.get_mendix_revision.outputs.revision_id }}
       run: |
-        echo "Starting Mendix build for AppId: $APP_ID"
+        echo "Starting Mendix build for AppId: $APP_ID with revision $MENDIX_REVISION"
 
         # Use a heredoc to construct the JSON payload, which is more robust
         # for variable expansion than nested quotes.
         BUILD_PAYLOAD=$(cat <<EOF
         {
             "branch": "main",
-            "revision": "$GIT_SHA",
+            "revision": "$MENDIX_REVISION",
             "version": "1.0.0.0"
         }
         EOF
