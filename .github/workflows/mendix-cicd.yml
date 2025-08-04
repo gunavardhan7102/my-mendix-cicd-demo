@@ -19,16 +19,21 @@ jobs:
 
     - name: Trigger Mendix Build and Wait for Completion
       id: mendix_build
+      env:
+        APP_ID: ${{ secrets.MENDIX_APP_ID }}
+        USERNAME: ${{ secrets.MENDIX_USERNAME }}
+        API_KEY: ${{ secrets.MENDIX_API_KEY }}
+        GIT_SHA: ${{ github.sha }}
       run: |
-        echo "Starting Mendix build for AppId: ${{ secrets.MENDIX_APP_ID }}"
+        echo "Starting Mendix build for AppId: $APP_ID"
 
-        BUILD_RESPONSE=$(curl --request POST 'https://deploy.mendix.com/api/1/apps/${{ secrets.MENDIX_APP_ID }}/packages' \
-          --header 'Content-Type: application/json' \
-          --header 'Mendix-Username: ${{ secrets.MENDIX_USERNAME }}' \
-          --header 'Mendix-ApiKey: ${{ secrets.MENDIX_API_KEY }}' \
+        BUILD_RESPONSE=$(curl --request POST "https://deploy.mendix.com/api/1/apps/$APP_ID/packages" \
+          --header "Content-Type: application/json" \
+          --header "Mendix-Username: $USERNAME" \
+          --header "Mendix-ApiKey: $API_KEY" \
           --data-raw '{
               "branch": "main",
-              "revision": "${{ github.sha }}",
+              "revision": "'"$GIT_SHA"'",
               "version": "1.0.0.0"
           }')
         
@@ -49,9 +54,9 @@ jobs:
         do
           echo "Current build status: $status"
           sleep 10
-          build_status_response=$(curl 'https://deploy.mendix.com/api/1/apps/${{ secrets.MENDIX_APP_ID }}/packages/${build_id}' \
-            --header 'Mendix-Username: ${{ secrets.MENDIX_USERNAME }}' \
-            --header 'Mendix-ApiKey: ${{ secrets.MENDIX_API_KEY }}')
+          build_status_response=$(curl "https://deploy.mendix.com/api/1/apps/$APP_ID/packages/$build_id" \
+            --header "Mendix-Username: $USERNAME" \
+            --header "Mendix-ApiKey: $API_KEY")
           
           status=$(echo "$build_status_response" | jq -r '.status')
         done
@@ -63,23 +68,31 @@ jobs:
 
     - name: Deploy to Mendix Free Node
       id: mendix_deploy
+      env:
+        APP_ID: ${{ secrets.MENDIX_APP_ID }}
+        USERNAME: ${{ secrets.MENDIX_USERNAME }}
+        API_KEY: ${{ secrets.MENDIX_API_KEY }}
       run: |
         build_id=${{ steps.mendix_build.outputs.build_id }}
         echo "Deploying build ID $build_id to Test environment..."
         
-        curl --request POST 'https://deploy.mendix.com/api/1/apps/${{ secrets.MENDIX_APP_ID }}/environments/Test/transport' \
-          --header 'Content-Type: application/json' \
-          --header 'Mendix-Username: ${{ secrets.MENDIX_USERNAME }}' \
-          --header 'Mendix-ApiKey: ${{ secrets.MENDIX_API_KEY }}' \
+        curl --request POST "https://deploy.mendix.com/api/1/apps/$APP_ID/environments/Test/transport" \
+          --header "Content-Type: application/json" \
+          --header "Mendix-Username: $USERNAME" \
+          --header "Mendix-ApiKey: $API_KEY" \
           --data-raw '{
-              "packageId": "$build_id"
+              "packageId": "'"$build_id"'"
           }'
 
     - name: Start Mendix Free Node
+      env:
+        APP_ID: ${{ secrets.MENDIX_APP_ID }}
+        USERNAME: ${{ secrets.MENDIX_USERNAME }}
+        API_KEY: ${{ secrets.MENDIX_API_KEY }}
       run: |
         echo "Starting Mendix Free Node..."
         
-        curl --request POST 'https://deploy.mendix.com/api/1/apps/${{ secrets.MENDIX_APP_ID }}/environments/Test/start' \
-          --header 'Content-Type: application/json' \
-          --header 'Mendix-Username: ${{ secrets.MENDIX_USERNAME }}' \
-          --header 'Mendix-ApiKey: ${{ secrets.MENDIX_API_KEY }}'
+        curl --request POST "https://deploy.mendix.com/api/1/apps/$APP_ID/environments/Test/start" \
+          --header "Content-Type: application/json" \
+          --header "Mendix-Username: $USERNAME" \
+          --header "Mendix-ApiKey: $API_KEY"
