@@ -21,18 +21,24 @@ import unittesting.proxies.UnitTestContext;
 
 public class AssertUsingExpression extends CustomJavaAction<IMendixObject>
 {
-	private java.lang.String name;
-	private java.lang.Boolean expression;
-	private java.lang.String failureMessage;
-	private java.lang.Boolean stopOnFailure;
+	private final java.lang.String name;
+	private final java.lang.Boolean expression;
+	private final java.lang.String failureMessage;
+	private final java.lang.Boolean stopOnFailure;
 
-	public AssertUsingExpression(IContext context, java.lang.String name, java.lang.Boolean expression, java.lang.String failureMessage, java.lang.Boolean stopOnFailure)
+	public AssertUsingExpression(
+		IContext context,
+		java.lang.String _name,
+		java.lang.Boolean _expression,
+		java.lang.String _failureMessage,
+		java.lang.Boolean _stopOnFailure
+	)
 	{
 		super(context);
-		this.name = name;
-		this.expression = expression;
-		this.failureMessage = failureMessage;
-		this.stopOnFailure = stopOnFailure;
+		this.name = _name;
+		this.expression = _expression;
+		this.failureMessage = _failureMessage;
+		this.stopOnFailure = _stopOnFailure;
 	}
 
 	@java.lang.Override

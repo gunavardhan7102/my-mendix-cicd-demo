@@ -16,20 +16,24 @@ import com.mendix.systemwideinterfaces.core.IMendixObject;
 
 public class UpdateTestSuiteCountersAndResult extends CustomJavaAction<java.lang.Void>
 {
-	private IMendixObject __testSuite;
-	private unittesting.proxies.TestSuite testSuite;
+	/** @deprecated use testSuite.getMendixObject() instead. */
+	@java.lang.Deprecated(forRemoval = true)
+	private final IMendixObject __testSuite;
+	private final unittesting.proxies.TestSuite testSuite;
 
-	public UpdateTestSuiteCountersAndResult(IContext context, IMendixObject testSuite)
+	public UpdateTestSuiteCountersAndResult(
+		IContext context,
+		IMendixObject _testSuite
+	)
 	{
 		super(context);
-		this.__testSuite = testSuite;
+		this.__testSuite = _testSuite;
+		this.testSuite = _testSuite == null ? null : unittesting.proxies.TestSuite.initialize(getContext(), _testSuite);
 	}
 
 	@java.lang.Override
 	public java.lang.Void executeAction() throws Exception
 	{
-		this.testSuite = this.__testSuite == null ? null : unittesting.proxies.TestSuite.initialize(getContext(), __testSuite);
-
 		// BEGIN USER CODE
 		TestManager.instance().updateTestSuiteCountersAndResult(getContext(), testSuite, true);
 		return null;

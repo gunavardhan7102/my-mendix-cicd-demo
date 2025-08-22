@@ -21,17 +21,17 @@ jobs:
       id: get_mendix_revision
       env:
         PROJECT_ID: ${{ secrets.MENDIX_PROJECT_ID }}
-        API_KEY: ${{ secrets.MENDIX_API_KEY }}
+        PAT: ${{ secrets.MENDIX_PERSONAL_ACCESS_TOKEN }} # Use the new PAT
         BRANCH_NAME: "main"
       run: |
         echo "Retrieving latest Mendix revision for project $PROJECT_ID..."
         REVISION_RESPONSE=$(curl "https://repository.api.mendix.com/v1/repositories/$PROJECT_ID/branches/$BRANCH_NAME/commits" \
-          --header "Authorization: MxToken $API_KEY")
+          --header "Authorization: MxToken $PAT") # Use the MxToken header
 
         LATEST_REVISION_ID=$(echo "$REVISION_RESPONSE" | jq -r '.items[0].id')
         
         if [ "$LATEST_REVISION_ID" == "null" ] || [ "$LATEST_REVISION_ID" == "" ]; then
-          echo "Failed to retrieve the latest Mendix revision. Please check your PROJECT_ID and API_KEY."
+          echo "Failed to retrieve the latest Mendix revision. Please check your PROJECT_ID and MENDIX_PERSONAL_ACCESS_TOKEN."
           echo "API Response was: ${REVISION_RESPONSE}"
           exit 1
         fi
